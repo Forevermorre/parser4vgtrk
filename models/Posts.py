@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, Column, Integer, BigInteger, String, Text, DateTime
+from sqlalchemy import create_engine, Column, Integer, BigInteger, String, Text, DateTime, JSON
 from sqlalchemy.dialects.mysql import TINYINT
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -48,6 +48,7 @@ class NewsPost(Base):
     title = Column(String(500))
     url = Column(String(500), unique=True)
     content = Column(String(10000))
+    media = Column(JSON, default=list)
     source = Column(String(100))
     source_type = Column(String(50), default='site')
     refactoredTitle = Column(String(255))
