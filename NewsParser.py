@@ -88,18 +88,23 @@ class NewsParser:
             return "", []
 
     def parse_mvd_page(self, session):
-        url = 'https://34.xn--b1aew.xn--p1ai/новости'
+        base_url = 'https://34.мвд.рф'
+        xn_url = 'https://34.xn--b1aew.xn--p1ai'
+
         try:
-            response = requests.get(url, headers=self.headers)
+            response = requests.get(f"{xn_url}/новости", headers=self.headers)
             soup = BeautifulSoup(response.text, 'html.parser')
 
             latest_news_block = soup.find('div', class_='sl-item-title')
             if latest_news_block:
                 title = latest_news_block.find('a').text.strip()
-                news_url = 'https://34.xn--b1aew.xn--p1ai' + latest_news_block.find('a')['href']
-                content, media = self.parse_mvd_content(news_url)
+                news_path = latest_news_block.find('a')['href']
+                content_url = f"{xn_url}{news_path}"
+                display_url = f"{base_url}{news_path}"
 
-                if self.get_or_create_news(session, title, news_url, content, 'mvd', 'site', media):
+                content, media = self.parse_mvd_content(content_url)
+
+                if self.get_or_create_news(session, title, display_url, content, 'mvd', 'site', media):
                     print(f"[MVD] Добавлена новая новость: {title}.")
                 else:
                     print("[MVD] Новых новостей нет.")
@@ -358,7 +363,7 @@ class NewsParser:
                 print("[TASS] Не удалось получить контент новости")
                 return
 
-            cleaned_content = self._clean_and_absolute_vesti_url(content)
+            cleaned_content = self._clean_tass_text(content)
 
             if self.get_or_create_news(session, title, news_url, cleaned_content, 'tass', 'site', media):
                 print(f"[TASS] Добавлена новая новость: {title}.")
@@ -411,10 +416,8 @@ class NewsParser:
             r"^[А-ЯЁ]+, \d{1,2} [а-яё]+\. — /ТАСС/",
             r"^/ТАСС/\.",
         ]
-
         if not text:
             return text
-
         for pattern in patterns:
             text = re.sub(pattern, "", text).strip()
 
