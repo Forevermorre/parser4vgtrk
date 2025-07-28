@@ -1,4 +1,4 @@
-# Telegram & RSS Parser
+# Парсер новостей
 ## Установка
 
 1. Клонируйте репозиторий:
@@ -9,11 +9,13 @@ cd parser4vgtrk
 ```
 
 2. Установите зависимости:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 3. Создайте файл **.env** с данными для авторизации:
+
 ```bash
 python DotEnvCreate.py
 ```
@@ -28,7 +30,7 @@ CHECK_INTERVAL=время_обновления_новостей_в_секунд�
 ```
 (Вам потребуются **API ID** и **API HASH** с [my.telegram.org](https://my.telegram.org/), а также **данные** для подключения к БД)
 
-4. Настройка источников
+4. Настройка источников:
 
 **data/channels.txt** — список Telegram-каналов. Примеры:
 ```
@@ -42,7 +44,7 @@ https://www.kommersant.ru/RSS/news.xml
 https://ria.ru/export/rss2/archive/index.xml
 ```
 
-5. Запуск
+5. Запуск:
 
 **Telegram-парсер:**
 ```bash
@@ -67,3 +69,9 @@ python NewsParser.py
 - [https://epp.genproc.gov.ru/web/proc_34](https://epp.genproc.gov.ru/web/proc_34)
 - [https://www.vesti.ru/search?q=волгоград&type=news&sort=date](https://www.vesti.ru/search?q=волгоград&type=news&sort=date)
 - [https://tass.ru/tag/volgogradskaya-oblast](https://tass.ru/tag/volgogradskaya-oblast)
+
+6. Очистка таблиц:
+
+```bash
+python ClearDatabase.py
+```

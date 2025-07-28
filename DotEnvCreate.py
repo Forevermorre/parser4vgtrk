@@ -30,7 +30,7 @@ CHECK_INTERVAL={check_interval}
 
     if env_path.exists():
         print("\nФайл .env уже существует.")
-        overwrite = input("Перезаписать его? (y/n): ").strip().lower()
+        overwrite = input("Перезаписать файл? [y/n]: ").strip().lower()
         if overwrite != 'y':
             print("Создание файла отменено.")
             return
