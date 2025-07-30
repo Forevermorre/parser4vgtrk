@@ -69,6 +69,19 @@ python NewsParser.py
 - [https://epp.genproc.gov.ru/web/proc_34](https://epp.genproc.gov.ru/web/proc_34)
 - [https://www.vesti.ru/search?q=волгоград&type=news&sort=date](https://www.vesti.ru/search?q=волгоград&type=news&sort=date)
 - [https://tass.ru/tag/volgogradskaya-oblast](https://tass.ru/tag/volgogradskaya-oblast)
+- [https://volgoduma.ru/](https://volgoduma.ru/)
+- [https://34.mchs.gov.ru](https://34.mchs.gov.ru)
+- [https://34.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya](https://34.mchs.gov.ru/deyatelnost/press-centr/operativnaya-informaciya)
+- [https://34.rospotrebnadzor.ru](https://34.rospotrebnadzor.ru)
+- [https://61.fsvps.gov.ru/news-cat/glavnoe/](https://61.fsvps.gov.ru/news-cat/glavnoe/)
+- [https://oblzdrav.volgograd.ru](https://oblzdrav.volgograd.ru)
+- [https://culture.volgograd.ru/current-activity/cooperation/news/](https://culture.volgograd.ru/current-activity/cooperation/news/)
+- [https://oblkompriroda.volgograd.ru/](https://oblkompriroda.volgograd.ru/)
+- [https://zmsut.sledcom.ru](https://zmsut.sledcom.ru)
+- [https://sfr.gov.ru/branches/volgograd/news/](https://sfr.gov.ru/branches/volgograd/news/)
+- [https://rpn.gov.ru/regions/34/news/](https://rpn.gov.ru/regions/34/news/)
+- [https://ria.ru/location_Volgograd/](https://ria.ru/location_Volgograd/)
+- [https://xras.ru/project_diary.html](https://xras.ru/project_diary.html)
 
 6. Очистка таблиц:
 
