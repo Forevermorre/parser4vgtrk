@@ -22,12 +22,13 @@ class NewsParser:
             'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7'
         }
 
-    def get_or_create_news(self, session, title, url, content, source, source_type='site', media=None):
+    def get_or_create_news(self, session, title, url, content, source, source_type='site', media=None, publish_date=None):
         existing_news = session.query(NewsPost).filter(NewsPost.url == url).first()
         if existing_news:
             return False
 
         news = NewsPost(
+            publish_date=publish_date,
             title=title,
             url=url,
             content=content,
@@ -50,9 +51,10 @@ class NewsParser:
                 titles = latest_news_block.find_all('a')
                 title = titles[1].text.strip()
                 news_url = 'https://volgograd.sledcom.ru' + titles[1]['href']
-                content, media = self.parse_sledcom_content(news_url)
+                content, media, publish_date = self.parse_sledcom_content(news_url)
 
-                if self.get_or_create_news(session, title, news_url, content, 'sledcom', 'site', media):
+                if self.get_or_create_news(session, title, news_url, content, 'sledcom', 'site', media,
+                                           publish_date):
                     print(f"[SLEDCOM] Добавлена новая новость: {title}.")
                 else:
                     print("[SLEDCOM] Новых новостей нет.")
@@ -64,6 +66,9 @@ class NewsParser:
         try:
             response = requests.get(url, verify=False, headers=self.headers)
             soup = BeautifulSoup(response.text, 'html.parser')
+
+            date_block = soup.find('div', class_='bl-item-date')
+            publish_date = date_block.text.strip() if date_block else None
 
             article = soup.find('article')
             paragraphs = article.find_all('p')
@@ -82,10 +87,10 @@ class NewsParser:
                             absolute_url = base_url + img['src']
                             media.append(absolute_url)
 
-            return content, media
+            return content, media, publish_date
         except Exception as e:
             print(f"[SLEDCOM] Ошибка при парсинге контента: {e}")
-            return "", []
+            return "", [], None
 
     def parse_mvd_page(self, session):
         base_url = 'https://34.мвд.рф'
@@ -102,9 +107,9 @@ class NewsParser:
                 content_url = f"{xn_url}{news_path}"
                 display_url = f"{base_url}{news_path}"
 
-                content, media = self.parse_mvd_content(content_url)
+                content, media, publish_date = self.parse_mvd_content(content_url)
 
-                if self.get_or_create_news(session, title, display_url, content, 'mvd', 'site', media):
+                if self.get_or_create_news(session, title, display_url, content, 'mvd', 'site', media, publish_date):
                     print(f"[MVD] Добавлена новая новость: {title}.")
                 else:
                     print("[MVD] Новых новостей нет.")
@@ -116,6 +121,9 @@ class NewsParser:
         try:
             response = requests.get(url, headers=self.headers)
             soup = BeautifulSoup(response.text, 'html.parser')
+
+            date_block = soup.find('div', class_='article-date-item')
+            publish_date = date_block.get_text(strip=True) if date_block else None
 
             article = soup.find('div', class_='article')
             paragraphs = article.find_all('p')
@@ -133,10 +141,10 @@ class NewsParser:
                                 '//') else 'https://static.mvd.ru' + img_url
                         media.append(img_url)
 
-            return content, media
+            return content, media, publish_date
         except Exception as e:
             print(f"[MVD] Ошибка при парсинге контента: {e}")
-            return "", []
+            return "", [], None
 
     def parse_volgadmin_page(self, session):
         url = 'https://www.volgadmin.ru/d/list/news/admvlg'
@@ -149,9 +157,9 @@ class NewsParser:
                 titles = latest_news_block.find_all('a')
                 title = titles[1].text.strip()
                 news_url = 'https://www.volgadmin.ru/d' + titles[1]['href']
-                content, media = self.parse_volgadmin_content(news_url)
+                content, media, publish_date = self.parse_volgadmin_content(news_url)
 
-                if self.get_or_create_news(session, title, news_url, content, 'volgadmin', 'site', media):
+                if self.get_or_create_news(session, title, news_url, content, 'volgadmin', 'site', media, publish_date):
                     print(f"[VOLGADMIN] Добавлена новая новость: {title}.")
                 else:
                     print("[VOLGADMIN] Новых новостей нет.")
@@ -165,18 +173,32 @@ class NewsParser:
             response.encoding = 'utf-8'
             soup = BeautifulSoup(response.text, 'html.parser')
 
+            date_block = soup.find('p', class_='date')
+            publish_date = date_block.get_text(strip=True) if date_block else None
+
             article = soup.find('div', class_='rightcol')
             if not article:
-                return "", []
+                return "", [], None
 
+            paragraphs = [tag for tag in article.find_all('p', recursive=False) if tag.get_text(strip=True)]
+
+            seen_texts = set()
             text_parts = []
-            for p in article.find_all('p'):
-                text = p.get_text(strip=True)
-                if text:
-                    text = text.replace('\xab', '"').replace('\xbb', '"')
+
+            for tag in paragraphs:
+                text = ' '.join(tag.stripped_strings)
+                text = text.replace('\xa0', ' ').replace('\u200b', '').replace('\ufeff', '')
+
+                text = text.replace(' ?757', ' №757').replace(' ? по', ' — по')
+
+                if len(text.strip()) < 5:
+                    continue
+
+                if text not in seen_texts:
+                    seen_texts.add(text)
                     text_parts.append(text)
 
-            content = ' '.join(text_parts)
+            content = '\n\n'.join(text_parts)
 
             media = []
             leftcol = soup.find('div', class_='leftcol')
@@ -188,10 +210,11 @@ class NewsParser:
                         img_url = 'https://www.volgadmin.ru' + img_url
                     media.append(img_url)
 
-            return content, media
+            return content, media, publish_date
+
         except Exception as e:
             print(f"[VOLGADMIN] Ошибка при парсинге контента: {e}")
-            return "", []
+            return "", [], None
 
     def parse_volgograd_news_page(self, session):
         url = 'https://www.volgograd.ru/news/'
@@ -203,9 +226,10 @@ class NewsParser:
             if latest_news_block:
                 title = latest_news_block.find('a').text.strip()
                 news_url = 'https://www.volgograd.ru' + latest_news_block.find('a')['href']
-                content, media = self.parse_volgograd_news_content(news_url)
+                content, media, publish_date = self.parse_volgograd_news_content(news_url)
 
-                if self.get_or_create_news(session, title, news_url, content, 'volgograd.ru', 'site', media):
+                if self.get_or_create_news(session, title, news_url, content, 'volgograd.ru', 'site', media,
+                                           publish_date):
                     print(f"[VOLGOGRAD.RU] Добавлена новая новость: {title}.")
                 else:
                     print("[VOLGOGRAD.RU] Новых новостей нет.")
@@ -219,11 +243,14 @@ class NewsParser:
             soup = BeautifulSoup(response.text, 'html.parser')
 
             article = soup.find('div', class_='news-detail')
+
+            date_div = article.find('div', class_='date')
+            publish_date = date_div.get_text(strip=True) if date_div else None
+
             paragraphs = article.find_all('p')
             content = ' '.join(p.get_text(strip=True) for p in paragraphs)
 
             media = []
-
             for fancybox in soup.find_all('a', rel='fancybox'):
                 if fancybox.get('href'):
                     img_url = fancybox['href']
@@ -232,10 +259,10 @@ class NewsParser:
                     if 'resize_cache' not in img_url:
                         media.append(img_url)
 
-            return content, list(set(media))
+            return content, list(set(media)), publish_date
         except Exception as e:
             print(f"[VOLGOGRAD.RU] Ошибка при парсинге контента: {e}")
-            return "", []
+            return "", [], None
 
     def parse_genproc_page(self, session):
         url = 'https://epp.genproc.gov.ru/web/proc_34'
@@ -249,13 +276,12 @@ class NewsParser:
                 news_url = latest_news_block.find('a', class_='feeds-main-page-portlet__list_text')['href']
                 if not news_url.startswith('http'):
                     news_url = 'https://epp.genproc.gov.ru' + news_url
-                content, media = self.parse_genproc_content(news_url)
+                content, media, publish_date = self.parse_genproc_content(news_url)
 
-                if self.get_or_create_news(session, title, news_url, content, 'genproc', 'site', media):
+                if self.get_or_create_news(session, title, news_url, content, 'genproc', 'site', media, publish_date):
                     print(f"[GENPROC] Добавлена новая новость: {title}.")
                 else:
                     print("[GENPROC] Новых новостей нет.")
-
         except Exception as e:
             print(f"[GENPROC] Ошибка при парсинге: {e}.")
 
@@ -263,6 +289,11 @@ class NewsParser:
         try:
             response = requests.get(url, headers=self.headers)
             soup = BeautifulSoup(response.text, 'html.parser')
+
+            publish_date = None
+            date_li = soup.find('li', class_='feeds-page__info_item')
+            if date_li:
+                publish_date = date_li.get_text(strip=True)
 
             article_text = soup.find('div', class_='feeds-page__article_text')
             paragraphs = article_text.find_all('p') if article_text else []
@@ -279,10 +310,10 @@ class NewsParser:
                             img_url = 'https://epp.genproc.gov.ru' + img_url
                         media.append(img_url)
 
-            return content, list(set(media))
+            return content, list(set(media)), publish_date
         except Exception as e:
             print(f"[GENPROC] Ошибка при парсинге контента: {e}")
-            return "", []
+            return "", [], None
 
     def parse_vesti_page(self, session):
         url = 'https://www.vesti.ru/search?q=волгоград&type=news&sort=date'
@@ -294,13 +325,12 @@ class NewsParser:
             if latest_news_block:
                 title = latest_news_block.find('h3', class_='list__title').text.strip()
                 news_url = 'https://www.vesti.ru' + latest_news_block.find('a', href=True)['href']
-                content, media = self.parse_vesti_content(news_url)
+                content, media, publish_date = self.parse_vesti_content(news_url)
 
-                if self.get_or_create_news(session, title, news_url, content, 'vesti', 'site', media):
+                if self.get_or_create_news(session, title, news_url, content, 'vesti', 'site', media, publish_date):
                     print(f"[VESTI] Добавлена новая новость: {title}.")
                 else:
                     print("[VESTI] Новых новостей нет.")
-
         except Exception as e:
             print(f"[VESTI] Ошибка при парсинге: {e}.")
 
@@ -309,34 +339,42 @@ class NewsParser:
             response = requests.get(url, headers=self.headers)
             soup = BeautifulSoup(response.text, 'html.parser')
 
+            publish_date = None
+            date_div = soup.find('div', class_='article__date')
+            time_span = date_div.find('span', class_='article__time') if date_div else None
+
+            if date_div and time_span:
+                date_text = date_div.contents[0].get_text(strip=True)
+                time_text = time_span.get_text(strip=True)
+                publish_date = f"{date_text}, {time_text}"
+
             article = soup.find('div', class_='js-mediator-article')
             paragraphs = article.find_all('p') if article else []
             content = ' '.join(p.get_text(strip=True) for p in paragraphs)
 
             media = []
             unwanted_keywords = ['counter', 'pixel', 'tracker', 'logo', 'icon']
-
             media_container = soup.find('div', class_='article__media')
             if media_container:
                 images = media_container.find_all('img')
                 for img in images:
                     img_url = (img.get('data-src') or img.get('src', '')).strip()
                     if img_url and not any(keyword in img_url.lower() for keyword in unwanted_keywords):
-                        img_url = self._clean_and_absolute_vesti_url(img_url)
+                        img_url = self.clean_and_absolute_vesti_url(img_url)
                         if img_url:
                             media.append(img_url)
 
             for img in soup.select('.article__body img'):
                 img_url = (img.get('src') or '').strip()
                 if img_url and not any(keyword in img_url.lower() for keyword in unwanted_keywords):
-                    img_url = self._clean_and_absolute_vesti_url(img_url)
+                    img_url = self.clean_and_absolute_vesti_url(img_url)
                     if img_url:
                         media.append(img_url)
 
-            return content, list(set(media))
+            return content, list(set(media)), publish_date
         except Exception as e:
             print(f"[VESTI] Ошибка при парсинге контента: {e}")
-            return "", []
+            return "", [], None
 
     def parse_tass_page(self, session):
         url = 'https://tass.ru/tag/volgogradskaya-oblast'
@@ -357,15 +395,15 @@ class NewsParser:
 
             title = title_element.text.strip()
             news_url = 'https://tass.ru' + latest_news_block['href']
-            content, media = self.parse_tass_content(news_url)
+            content, media, publish_date = self.parse_tass_content(news_url)
 
             if not content:
                 print("[TASS] Не удалось получить контент новости")
                 return
 
-            cleaned_content = self._clean_tass_text(content)
+            cleaned_content = self.clean_tass_text(content)
 
-            if self.get_or_create_news(session, title, news_url, cleaned_content, 'tass', 'site', media):
+            if self.get_or_create_news(session, title, news_url, cleaned_content, 'tass', 'site', media, publish_date):
                 print(f"[TASS] Добавлена новая новость: {title}.")
             else:
                 print("[TASS] Новых новостей нет.")
@@ -381,9 +419,14 @@ class NewsParser:
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
 
+            publish_date = None
+            date_div = soup.find('div', class_='PublishedMark_date__a321B')
+            if date_div:
+                publish_date = date_div.get_text(strip=True)
+
             article = soup.find('article')
             if not article:
-                return "", []
+                return "", [], publish_date
 
             paragraphs = article.find_all('p')
             content = '\n'.join(p.get_text(strip=True) for p in paragraphs if p.text.strip())
@@ -394,23 +437,22 @@ class NewsParser:
                 images = media_container.find_all('img')
                 for img in images:
                     if img.get('src'):
-                        img_url = img['src']
-                        img_url = img_url.split('?')[0].split('#')[0]
+                        img_url = img['src'].split('?')[0].split('#')[0]
                         if any(img_url.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.webp']):
                             if not img_url.startswith('http'):
                                 img_url = 'https:' + img_url if img_url.startswith(
                                     '//') else 'https://tass.ru' + img_url
                             media.append(img_url)
 
-            return content, list(set(media))
+            return content, list(set(media)), publish_date
         except requests.exceptions.RequestException as e:
             print(f"[TASS] Ошибка загрузки контента: {e}")
-            return "", []
+            return "", [], None
         except Exception as e:
             print(f"[TASS] Ошибка обработки контента: {e}")
-            return "", []
+            return "", [], None
 
-    def _clean_tass_text(self, text):
+    def clean_tass_text(self, text):
         patterns = [
             r"^[А-ЯЁ]+, \d{1,2} [а-яё]+\. /ТАСС/\.",
             r"^[А-ЯЁ]+, \d{1,2} [а-яё]+\. — /ТАСС/",
@@ -423,7 +465,7 @@ class NewsParser:
 
         return text
 
-    def _clean_and_absolute_vesti_url(self, url):
+    def clean_and_absolute_vesti_url(self, url):
         if not url or url.startswith('data:'):
             return None
 

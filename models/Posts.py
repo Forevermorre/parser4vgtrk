@@ -45,6 +45,7 @@ class NewsPost(Base):
     __tablename__ = 'news_posts'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    publish_date = Column(String(50))
     title = Column(String(500))
     url = Column(String(500), unique=True)
     content = Column(String(10000))
